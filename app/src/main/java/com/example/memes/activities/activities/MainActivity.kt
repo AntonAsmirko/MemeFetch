@@ -2,8 +2,10 @@ package com.example.memes.activities.activities
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.drawable.GradientDrawable
 import android.os.AsyncTask
 import android.os.Bundle
 import androidx.activity.viewModels
@@ -32,6 +34,7 @@ class MainActivity : AppCompatActivity() {
     companion object {
         const val ACCESS_NETWORK_STATE_PERMISSION_REQUEST_ID = 111
         const val INTERNET_PERMISSION_REQUEST_ID = 101
+        const val IMG_KEY = "IMG_KEK"
     }
 
     private lateinit var imagesAdapter: ImagesAdapter
@@ -55,7 +58,11 @@ class MainActivity : AppCompatActivity() {
         }
         val model: ImagesViewModel by viewModels()
         initRecycler()
-        loadData(model)
+        if (model.memesWithImages.value == null) {
+            loadData(model)
+        } else {
+            imagesAdapter.loadNewMemes(model.memesWithImages.value!!)
+        }
     }
 
     private fun loadData(model: ImagesViewModel) {
@@ -75,8 +82,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun initRecycler() {
-        imagesAdapter = ImagesAdapter(listOf())
-        val gridLayoutManager = GridLayoutManager(this, 3)
+        imagesAdapter = ImagesAdapter(listOf(), this)
+        val gridLayoutManager = GridLayoutManager(
+            this,
+            if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) 5 else 3
+        )
         images_recycler.layoutManager = gridLayoutManager
         images_recycler.adapter = imagesAdapter
     }

@@ -6,6 +6,6 @@ import com.example.memes.activities.data.MemWithBitmap
 
 class ImagesViewModel : ViewModel() {
     val memes = MutableLiveData<String>()
-    val memesWithImages = MutableLiveData<List<MemWithBitmap>>()
+    val memesWithImages = MutableLiveData<List<MemWithBitmap>?>()
 
 }
