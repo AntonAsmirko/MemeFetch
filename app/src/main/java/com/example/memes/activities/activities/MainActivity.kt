@@ -1,6 +1,10 @@
 package com.example.memes.activities.activities
 
 import android.Manifest
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Bitmap
@@ -8,6 +12,7 @@ import android.graphics.BitmapFactory
 import android.graphics.drawable.GradientDrawable
 import android.os.AsyncTask
 import android.os.Bundle
+import android.os.IBinder
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDialogFragment
@@ -24,6 +29,7 @@ import com.example.memes.activities.data.MemWithBitmap
 import com.example.memes.activities.data.ServerResponse
 import com.example.memes.activities.fragments.DisplayBigImageFragment
 import com.example.memes.activities.fragments.MainFragment
+import com.example.memes.activities.services.FetchMemesServer
 import com.example.memes.activities.viewModel.ImagesViewModel
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -43,12 +49,33 @@ class MainActivity : AppCompatActivity(), ImagesAdapter.FragmentSwitcher {
     private lateinit var mainFragment: MainFragment
     private var displayBigImageFragment: DisplayBigImageFragment? = null
     private var curFragment = CurrentFragment.MAIN_FRAGMENT
+    private lateinit var mService: FetchMemesServer
+    private var mBound: Boolean = false
+
 
     companion object {
         const val ACCESS_NETWORK_STATE_PERMISSION_REQUEST_ID = 111
         const val INTERNET_PERMISSION_REQUEST_ID = 101
         const val IMG_KEY = "IMG_KEK"
     }
+
+    val model: ImagesViewModel by viewModels()
+
+    private val connection = object : ServiceConnection {
+
+        override fun onServiceConnected(className: ComponentName, service: IBinder) {
+            // We've bound to LocalService, cast the IBinder and get LocalService instance
+            val binder = service as FetchMemesServer.LocalBinder
+            mService = binder.getService()
+            mBound = true
+            loadData(model)
+        }
+
+        override fun onServiceDisconnected(arg0: ComponentName) {
+            mBound = false
+        }
+    }
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -67,19 +94,20 @@ class MainActivity : AppCompatActivity(), ImagesAdapter.FragmentSwitcher {
                 INTERNET_PERMISSION_REQUEST_ID
             )
         }
-        val model: ImagesViewModel by viewModels()
         mainFragment = MainFragment()
         displayBigImageFragment = DisplayBigImageFragment()
         val fragmentTransaction = supportFragmentManager.beginTransaction()
         fragmentTransaction.add(R.id.fragment_holder, mainFragment, "kek").commit()
         if (model.memesWithImages.value == null) {
-            loadData(model)
+            Intent(this, FetchMemesServer::class.java).also { intent ->
+                bindService(intent, connection, Context.BIND_AUTO_CREATE)
+            }
         } else {
             updateRecycler(model)
         }
     }
 
-    private fun updateRecycler(model: ImagesViewModel){
+    private fun updateRecycler(model: ImagesViewModel) {
         val newVal = mutableListOf<MemWithBitmap>()
         newVal.addAll(mainFragment.listData.value ?: listOf())
         newVal.addAll(model.memesWithImages.value ?: listOf())
@@ -96,10 +124,9 @@ class MainActivity : AppCompatActivity(), ImagesAdapter.FragmentSwitcher {
                 gson.fromJson(model.memes.value, ServerResponse::class.java)
             val res = objList.data.memes
             val query = res.map { Pair(it.url, it.name) }
-            model.memesWithImages.value = FetchImagesForMemesAsyncTask().execute(query).get()
+            model.memesWithImages.value = mService.fetchImages(query)
         })
-        model.memes.value = FetchMemesAsyncTask()
-            .execute().get()
+        model.memes.value = mService.fetchMemes()
     }
 
     private fun checkPermissionInternet(): Boolean {
@@ -114,37 +141,6 @@ class MainActivity : AppCompatActivity(), ImagesAdapter.FragmentSwitcher {
             this,
             Manifest.permission.ACCESS_NETWORK_STATE
         ) != PackageManager.PERMISSION_GRANTED
-    }
-
-    class FetchMemesAsyncTask : AsyncTask<String, Unit, String>() {
-        override fun doInBackground(vararg params: String?): String {
-            return URL("https://api.imgflip.com/get_memes").openConnection().run {
-                connect()
-                getInputStream().bufferedReader().readLines().joinToString("")
-            }
-        }
-    }
-
-    class FetchImagesForMemesAsyncTask :
-        AsyncTask<List<Pair<String, String>>, Unit, List<MemWithBitmap>>() {
-        override fun doInBackground(vararg params: List<Pair<String, String>>?): List<MemWithBitmap> {
-            return params[0]!!.map { MemWithBitmap(getBitmapFromURL(it.first), it.second) }
-        }
-
-        private fun getBitmapFromURL(src: String?): Bitmap? {
-            return try {
-                val url = URL(src)
-                val connection: HttpURLConnection = url
-                    .openConnection() as HttpURLConnection
-                connection.doInput = true
-                connection.connect()
-                val input: InputStream = connection.inputStream
-                BitmapFactory.decodeStream(input)
-            } catch (e: IOException) {
-                e.printStackTrace()
-                null
-            }
-        }
     }
 
     override fun switchFragments(bitmap: Bitmap) {
