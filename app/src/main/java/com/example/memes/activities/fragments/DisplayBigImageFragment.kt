@@ -12,7 +12,7 @@ import com.example.memes.R
 
 class DisplayBigImageFragment : Fragment() {
 
-    lateinit var imgView: ImageView
+    private lateinit var imgView: ImageView
     lateinit var bitmap: Bitmap
 
     override fun onCreate(savedInstanceState: Bundle?) {

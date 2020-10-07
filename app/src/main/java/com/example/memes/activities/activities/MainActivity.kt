@@ -75,14 +75,21 @@ class MainActivity : AppCompatActivity(), ImagesAdapter.FragmentSwitcher {
         if (model.memesWithImages.value == null) {
             loadData(model)
         } else {
-            mainFragment.imagesAdapter.loadNewMemes(model.memesWithImages.value!!)
+            updateRecycler(model)
         }
+    }
+
+    private fun updateRecycler(model: ImagesViewModel){
+        val newVal = mutableListOf<MemWithBitmap>()
+        newVal.addAll(mainFragment.listData.value ?: listOf())
+        newVal.addAll(model.memesWithImages.value ?: listOf())
+        mainFragment.listData.value = newVal
     }
 
     private fun loadData(model: ImagesViewModel) {
         val gson = Gson()
         model.memesWithImages.observe(this, Observer {
-            mainFragment.imagesAdapter.loadNewMemes(model.memesWithImages.value!!)
+            updateRecycler(model)
         })
         model.memes.observe(this, Observer {
             val objList: ServerResponse =

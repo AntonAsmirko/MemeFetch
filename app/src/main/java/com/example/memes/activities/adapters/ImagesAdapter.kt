@@ -1,22 +1,16 @@
 package com.example.memes.activities.adapters
 
-import android.app.Activity
-import android.content.Context
-import android.content.Intent
 import android.graphics.Bitmap
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ImageSwitcher
 import android.widget.ImageView
 import androidx.recyclerview.widget.RecyclerView
 import com.example.memes.R
-import com.example.memes.activities.activities.MainActivity
 import com.example.memes.activities.data.MemWithBitmap
 
 class ImagesAdapter(
     private var memesArray: List<MemWithBitmap>,
-    private val context: Activity,
     private val switcher: FragmentSwitcher
 ) :
     RecyclerView.Adapter<ImagesAdapter.ImagesViewHolder>() {

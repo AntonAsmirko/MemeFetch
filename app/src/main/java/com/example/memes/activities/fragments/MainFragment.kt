@@ -6,8 +6,6 @@ import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.fragment.app.FragmentActivity
-import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.Observer
 import androidx.recyclerview.widget.GridLayoutManager
@@ -21,6 +19,7 @@ class MainFragment : Fragment() {
     private lateinit var rootView: View
     private lateinit var recyclerView: RecyclerView
     lateinit var imagesAdapter: ImagesAdapter
+    var listData = MutableLiveData<MutableList<MemWithBitmap>>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,8 +40,14 @@ class MainFragment : Fragment() {
     }
 
     private fun initRecycler() {
-        if(!::imagesAdapter.isInitialized){
-            imagesAdapter = ImagesAdapter(listOf(), activity as FragmentActivity, activity as ImagesAdapter.FragmentSwitcher)
+        if (!::imagesAdapter.isInitialized) {
+            imagesAdapter = ImagesAdapter(
+                listData.value ?: listOf(),
+                activity as ImagesAdapter.FragmentSwitcher
+            )
+            listData.observe(requireActivity(), Observer {
+                imagesAdapter.loadNewMemes(listData.value!!)
+            })
         }
         val gridLayoutManager = GridLayoutManager(
             activity,
