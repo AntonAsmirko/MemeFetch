@@ -7,50 +7,24 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.content.res.Configuration
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.drawable.GradientDrawable
-import android.os.AsyncTask
 import android.os.Bundle
 import android.os.IBinder
-import android.util.Log
-import androidx.activity.viewModels
+import android.view.View
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.app.AppCompatDialogFragment
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.fragment.app.FragmentTransaction
-import androidx.fragment.app.add
-import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.Observer
 import androidx.recyclerview.widget.GridLayoutManager
 import com.example.memes.R
 import com.example.memes.activities.adapters.ImagesAdapter
-import com.example.memes.activities.data.Mem
 import com.example.memes.activities.data.MemWithBitmap
-import com.example.memes.activities.data.ServerResponse
-import com.example.memes.activities.fragments.DisplayBigImageFragment
-import com.example.memes.activities.fragments.MainFragment
 import com.example.memes.activities.services.FetchMemesServer
-import com.example.memes.activities.viewModel.ImagesViewModel
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 import kotlinx.android.synthetic.main.activity_main.*
-import java.io.IOException
-import java.io.InputStream
-import java.net.HttpURLConnection
-import java.net.URL
 
 
-class MainActivity : AppCompatActivity(), ImagesAdapter.FragmentSwitcher {
+class MainActivity : AppCompatActivity() {
 
-    private enum class CurrentFragment {
-        MAIN_FRAGMENT, DISPLAY_BIG_IMAGE_FRAGMENT
-    }
+    lateinit var imagesAdapter: ImagesAdapter
 
-    private lateinit var mainFragment: MainFragment
-    private var displayBigImageFragment: DisplayBigImageFragment? = null
-    private var curFragment = CurrentFragment.MAIN_FRAGMENT
     private lateinit var mService: FetchMemesServer
     private var mBound: Boolean = false
 
@@ -61,15 +35,13 @@ class MainActivity : AppCompatActivity(), ImagesAdapter.FragmentSwitcher {
         const val IMG_KEY = "IMG_KEK"
     }
 
-    val model: ImagesViewModel by viewModels()
-
     private val connection = object : ServiceConnection {
 
         override fun onServiceConnected(className: ComponentName, service: IBinder) {
             val binder = service as FetchMemesServer.LocalBinder
             mService = binder.getService()
             mBound = true
-            loadData(model)
+            initRecycler(mService.requestData())
         }
 
         override fun onServiceDisconnected(arg0: ComponentName) {
@@ -95,28 +67,23 @@ class MainActivity : AppCompatActivity(), ImagesAdapter.FragmentSwitcher {
                 INTERNET_PERMISSION_REQUEST_ID
             )
         }
-        mainFragment = MainFragment(model.memesWithImages)
-        displayBigImageFragment = DisplayBigImageFragment()
-        val fragmentTransaction = supportFragmentManager.beginTransaction()
-        fragmentTransaction.add(R.id.fragment_holder, mainFragment, "kek").commit()
-        if (model.memesWithImages.value!!.isEmpty()) {
+        if (!mBound) {
             Intent(this, FetchMemesServer::class.java).also { intent ->
                 bindService(intent, connection, Context.BIND_AUTO_CREATE)
             }
         }
     }
 
-    private fun loadData(model: ImagesViewModel) {
-        val gson = Gson()
-        model.memes.observe(this, Observer {
-            val objList: ServerResponse =
-                gson.fromJson(model.memes.value, ServerResponse::class.java)
-            val res = objList.data.memes
-            val query = res.map { Pair(it.url, it.name) }
-            mService.fetchImages(query, model.memesWithImages)
-            Log.d("KEK", "DATA WAS FETCHED")
-        })
-        model.memes.value = mService.fetchMemes()
+    private fun initRecycler(data: List<MemWithBitmap>) {
+        if (!::imagesAdapter.isInitialized) {
+            imagesAdapter = ImagesAdapter(data, this)
+        }
+        val gridLayoutManager = GridLayoutManager(
+            this,
+            if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) 5 else 3
+        )
+        images_recycler.layoutManager = gridLayoutManager
+        images_recycler.adapter = imagesAdapter
     }
 
     private fun checkPermissionInternet(): Boolean {
@@ -131,21 +98,5 @@ class MainActivity : AppCompatActivity(), ImagesAdapter.FragmentSwitcher {
             this,
             Manifest.permission.ACCESS_NETWORK_STATE
         ) != PackageManager.PERMISSION_GRANTED
-    }
-
-    override fun switchFragments(bitmap: Bitmap) {
-        supportFragmentManager.beginTransaction().remove(mainFragment)
-            .add(R.id.fragment_holder, displayBigImageFragment!!, "lol").commit()
-        displayBigImageFragment!!.bitmap = bitmap
-        curFragment = CurrentFragment.DISPLAY_BIG_IMAGE_FRAGMENT
-    }
-
-    override fun onBackPressed() {
-        if (curFragment == CurrentFragment.DISPLAY_BIG_IMAGE_FRAGMENT) {
-            supportFragmentManager.beginTransaction().remove(displayBigImageFragment!!)
-                .add(R.id.fragment_holder, mainFragment, "kek").commit()
-        } else {
-            super.onBackPressed()
-        }
     }
 }

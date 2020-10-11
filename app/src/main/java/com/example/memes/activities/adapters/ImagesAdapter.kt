@@ -1,6 +1,7 @@
 package com.example.memes.activities.adapters
 
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.util.Log
 import android.view.LayoutInflater
@@ -12,22 +13,12 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.Observer
 import androidx.recyclerview.widget.RecyclerView
 import com.example.memes.R
+import com.example.memes.activities.activities.DisplayImageActivity
 import com.example.memes.activities.data.MemWithBitmap
 
 class ImagesAdapter(
-    private var memesArray: MutableLiveData<MutableList<MemWithBitmap>>,
-    private val switcher: FragmentSwitcher,
-    lifeCycle: LifecycleOwner
-) :
+    private var memesArray: List<MemWithBitmap>, private val context: Context) :
     RecyclerView.Adapter<ImagesAdapter.ImagesViewHolder>() {
-
-    init {
-        memesArray.observe(lifeCycle, Observer {
-            Log.d("KEK", "Reacted list size ${memesArray.value!!.size}")
-            notifyDataSetChanged()
-        })
-        Log.d("KEK", "Observer was attached")
-    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ImagesViewHolder {
         return ImagesViewHolder(
@@ -36,11 +27,11 @@ class ImagesAdapter(
     }
 
     override fun getItemCount(): Int {
-        return memesArray.value!!.size
+        return memesArray.size
     }
 
     override fun onBindViewHolder(holder: ImagesViewHolder, position: Int) {
-        val memWithBitmap = memesArray.value!![position]
+        val memWithBitmap = memesArray[position]
         holder.setData(memWithBitmap)
     }
 
@@ -49,13 +40,10 @@ class ImagesAdapter(
         fun setData(memWithBitmap: MemWithBitmap) {
             imageView.setImageBitmap(memWithBitmap.bitmap)
             view.setOnClickListener {
-                switcher.switchFragments(memWithBitmap.bitmap!!)
-
+                val i = Intent(context, DisplayImageActivity::class.java)
+                i.putExtra("LLL" ,memWithBitmap.index)
+                context.startActivity(i)
             }
         }
-    }
-
-    interface FragmentSwitcher {
-        fun switchFragments(bitmap: Bitmap)
     }
 }

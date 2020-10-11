@@ -9,6 +9,8 @@ import android.os.Binder
 import android.os.IBinder
 import androidx.lifecycle.MutableLiveData
 import com.example.memes.activities.data.MemWithBitmap
+import com.example.memes.activities.data.ServerResponse
+import com.google.gson.Gson
 import java.io.IOException
 import java.io.InputStream
 import java.net.HttpURLConnection
@@ -16,40 +18,41 @@ import java.net.URL
 
 class FetchMemesServer : Service() {
 
+    inner class LocalBinder : Binder() {
+        fun getService(): FetchMemesServer = this@FetchMemesServer
+    }
+
+    private lateinit var jsonResponce: ServerResponse
+    private lateinit var memes: List<MemWithBitmap>
+
     private val binder = LocalBinder()
     private var str = true
+
+    fun requestData(): List<MemWithBitmap> {
+        if (!::memes.isInitialized) {
+            if (!::jsonResponce.isInitialized) {
+                val responce = fetchMemes()
+                jsonResponce = Gson().fromJson(responce, ServerResponse::class.java)
+            }
+            val urls = jsonResponce.data.memes.map { it.url }
+            memes = FetchImagesForMemesAsyncTask().execute(urls).get()
+        }
+        return memes
+    }
 
     override fun onBind(intent: Intent?): IBinder? {
         return binder
     }
 
-    inner class LocalBinder : Binder() {
-        fun getService(): FetchMemesServer = this@FetchMemesServer
-    }
-
-    fun fetchImages(
-        query: List<Pair<String, String>>,
-        list: MutableLiveData<MutableList<MemWithBitmap>>
-    ) {
-        query.forEach {
-            list.value = list.value
-            FetchImagesForMemesAsyncTask().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, Pair(it.first, list)).get()
-        }
-    }
-
-    fun fetchMemes(): String {
+    private fun fetchMemes(): String {
         return FetchMemesAsyncTask().execute().get()
     }
 
     class FetchImagesForMemesAsyncTask :
-        AsyncTask<Pair<String, MutableLiveData<MutableList<MemWithBitmap>>>, Unit, Unit>() {
-        override fun doInBackground(vararg params: Pair<String, MutableLiveData<MutableList<MemWithBitmap>>>?) {
-            params[0]!!.second.value!!.add(
-                MemWithBitmap(
-                    getBitmapFromURL(params[0]!!.first),
-                    "tmp"
-                )
-            )
+        AsyncTask<List<String>, Unit, List<MemWithBitmap>>() {
+        override fun doInBackground(vararg params: List<String>): List<MemWithBitmap> {
+            var index = 0
+            return params[0].map { MemWithBitmap(getBitmapFromURL(it), index++) }
         }
 
         private fun getBitmapFromURL(src: String?): Bitmap? {
