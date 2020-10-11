@@ -13,6 +13,7 @@ import android.graphics.drawable.GradientDrawable
 import android.os.AsyncTask
 import android.os.Bundle
 import android.os.IBinder
+import android.util.Log
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDialogFragment
@@ -20,6 +21,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentTransaction
 import androidx.fragment.app.add
+import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.Observer
 import androidx.recyclerview.widget.GridLayoutManager
 import com.example.memes.R
@@ -64,7 +66,6 @@ class MainActivity : AppCompatActivity(), ImagesAdapter.FragmentSwitcher {
     private val connection = object : ServiceConnection {
 
         override fun onServiceConnected(className: ComponentName, service: IBinder) {
-            // We've bound to LocalService, cast the IBinder and get LocalService instance
             val binder = service as FetchMemesServer.LocalBinder
             mService = binder.getService()
             mBound = true
@@ -94,37 +95,26 @@ class MainActivity : AppCompatActivity(), ImagesAdapter.FragmentSwitcher {
                 INTERNET_PERMISSION_REQUEST_ID
             )
         }
-        mainFragment = MainFragment()
+        mainFragment = MainFragment(model.memesWithImages)
         displayBigImageFragment = DisplayBigImageFragment()
         val fragmentTransaction = supportFragmentManager.beginTransaction()
         fragmentTransaction.add(R.id.fragment_holder, mainFragment, "kek").commit()
-        if (model.memesWithImages.value == null) {
+        if (model.memesWithImages.value!!.isEmpty()) {
             Intent(this, FetchMemesServer::class.java).also { intent ->
                 bindService(intent, connection, Context.BIND_AUTO_CREATE)
             }
-        } else {
-            updateRecycler(model)
         }
-    }
-
-    private fun updateRecycler(model: ImagesViewModel) {
-        val newVal = mutableListOf<MemWithBitmap>()
-        newVal.addAll(mainFragment.listData.value ?: listOf())
-        newVal.addAll(model.memesWithImages.value ?: listOf())
-        mainFragment.listData.value = newVal
     }
 
     private fun loadData(model: ImagesViewModel) {
         val gson = Gson()
-        model.memesWithImages.observe(this, Observer {
-            updateRecycler(model)
-        })
         model.memes.observe(this, Observer {
             val objList: ServerResponse =
                 gson.fromJson(model.memes.value, ServerResponse::class.java)
             val res = objList.data.memes
             val query = res.map { Pair(it.url, it.name) }
-            model.memesWithImages.value = mService.fetchImages(query)
+            mService.fetchImages(query, model.memesWithImages)
+            Log.d("KEK", "DATA WAS FETCHED")
         })
         model.memes.value = mService.fetchMemes()
     }

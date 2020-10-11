@@ -14,12 +14,11 @@ import com.example.memes.R
 import com.example.memes.activities.adapters.ImagesAdapter
 import com.example.memes.activities.data.MemWithBitmap
 
-class MainFragment : Fragment() {
+class MainFragment(private val listData: MutableLiveData<MutableList<MemWithBitmap>>) : Fragment() {
 
     private lateinit var rootView: View
     private lateinit var recyclerView: RecyclerView
     lateinit var imagesAdapter: ImagesAdapter
-    var listData = MutableLiveData<MutableList<MemWithBitmap>>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,12 +41,10 @@ class MainFragment : Fragment() {
     private fun initRecycler() {
         if (!::imagesAdapter.isInitialized) {
             imagesAdapter = ImagesAdapter(
-                listData.value ?: listOf(),
-                activity as ImagesAdapter.FragmentSwitcher
+                listData,
+                requireActivity() as ImagesAdapter.FragmentSwitcher,
+                requireActivity()
             )
-            listData.observe(requireActivity(), Observer {
-                imagesAdapter.loadNewMemes(listData.value!!)
-            })
         }
         val gridLayoutManager = GridLayoutManager(
             activity,

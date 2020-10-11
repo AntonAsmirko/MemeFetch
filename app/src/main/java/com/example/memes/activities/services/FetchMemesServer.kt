@@ -7,6 +7,7 @@ import android.graphics.BitmapFactory
 import android.os.AsyncTask
 import android.os.Binder
 import android.os.IBinder
+import androidx.lifecycle.MutableLiveData
 import com.example.memes.activities.data.MemWithBitmap
 import java.io.IOException
 import java.io.InputStream
@@ -16,6 +17,7 @@ import java.net.URL
 class FetchMemesServer : Service() {
 
     private val binder = LocalBinder()
+    private var str = true
 
     override fun onBind(intent: Intent?): IBinder? {
         return binder
@@ -25,8 +27,14 @@ class FetchMemesServer : Service() {
         fun getService(): FetchMemesServer = this@FetchMemesServer
     }
 
-    fun fetchImages(query: List<Pair<String, String>>): List<MemWithBitmap> {
-        return FetchImagesForMemesAsyncTask().execute(query).get()
+    fun fetchImages(
+        query: List<Pair<String, String>>,
+        list: MutableLiveData<MutableList<MemWithBitmap>>
+    ) {
+        query.forEach {
+            list.value = list.value
+            FetchImagesForMemesAsyncTask().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, Pair(it.first, list)).get()
+        }
     }
 
     fun fetchMemes(): String {
@@ -34,9 +42,14 @@ class FetchMemesServer : Service() {
     }
 
     class FetchImagesForMemesAsyncTask :
-        AsyncTask<List<Pair<String, String>>, Unit, List<MemWithBitmap>>() {
-        override fun doInBackground(vararg params: List<Pair<String, String>>?): List<MemWithBitmap> {
-            return params[0]!!.map { MemWithBitmap(getBitmapFromURL(it.first), it.second) }
+        AsyncTask<Pair<String, MutableLiveData<MutableList<MemWithBitmap>>>, Unit, Unit>() {
+        override fun doInBackground(vararg params: Pair<String, MutableLiveData<MutableList<MemWithBitmap>>>?) {
+            params[0]!!.second.value!!.add(
+                MemWithBitmap(
+                    getBitmapFromURL(params[0]!!.first),
+                    "tmp"
+                )
+            )
         }
 
         private fun getBitmapFromURL(src: String?): Bitmap? {
