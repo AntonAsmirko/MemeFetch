@@ -22,9 +22,8 @@ class DisplayImageActivity : AppCompatActivity() {
             val binder = service as FetchMemesServer.LocalBinder
             mService = binder.getService()
             mBound = true
-            val pos = intent.getIntExtra("LLL", 0)
-            val data = mService.requestData()
-            big_img.setImageBitmap(data[pos].bitmap)
+            val pos = intent.getIntExtra(MainActivity.IMG_KEY, 0)
+            big_img.setImageBitmap(mService.memes[pos].bitmap)
         }
 
         override fun onServiceDisconnected(arg0: ComponentName) {

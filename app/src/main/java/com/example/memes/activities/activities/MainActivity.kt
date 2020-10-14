@@ -9,7 +9,6 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Bundle
 import android.os.IBinder
-import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -41,7 +40,10 @@ class MainActivity : AppCompatActivity() {
             val binder = service as FetchMemesServer.LocalBinder
             mService = binder.getService()
             mBound = true
-            initRecycler(mService.requestData())
+            initRecycler(mService.memes)
+            if (mService.memes.isEmpty()) {
+                mService.stickToData(imagesAdapter)
+            }
         }
 
         override fun onServiceDisconnected(arg0: ComponentName) {

@@ -14,6 +14,7 @@ import androidx.lifecycle.Observer
 import androidx.recyclerview.widget.RecyclerView
 import com.example.memes.R
 import com.example.memes.activities.activities.DisplayImageActivity
+import com.example.memes.activities.activities.MainActivity
 import com.example.memes.activities.data.MemWithBitmap
 
 class ImagesAdapter(
@@ -41,7 +42,7 @@ class ImagesAdapter(
             imageView.setImageBitmap(memWithBitmap.bitmap)
             view.setOnClickListener {
                 val i = Intent(context, DisplayImageActivity::class.java)
-                i.putExtra("LLL" ,memWithBitmap.index)
+                i.putExtra(MainActivity.IMG_KEY ,memWithBitmap.index)
                 context.startActivity(i)
             }
         }

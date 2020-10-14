@@ -7,12 +7,17 @@ import android.graphics.BitmapFactory
 import android.os.AsyncTask
 import android.os.Binder
 import android.os.IBinder
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.Observer
+import androidx.lifecycle.observe
+import com.example.memes.activities.adapters.ImagesAdapter
 import com.example.memes.activities.data.MemWithBitmap
 import com.example.memes.activities.data.ServerResponse
 import com.google.gson.Gson
 import java.io.IOException
 import java.io.InputStream
+import java.io.ObjectInput
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -23,21 +28,24 @@ class FetchMemesServer : Service() {
     }
 
     private lateinit var jsonResponce: ServerResponse
-    private lateinit var memes: List<MemWithBitmap>
-
+    var memes = mutableListOf<MemWithBitmap>()
+    private lateinit var imagesAdapter: ImagesAdapter
     private val binder = LocalBinder()
-    private var str = true
 
-    fun requestData(): List<MemWithBitmap> {
-        if (!::memes.isInitialized) {
-            if (!::jsonResponce.isInitialized) {
-                val responce = fetchMemes()
-                jsonResponce = Gson().fromJson(responce, ServerResponse::class.java)
-            }
-            val urls = jsonResponce.data.memes.map { it.url }
-            memes = FetchImagesForMemesAsyncTask().execute(urls).get()
+    fun stickToData(imagesAdapter: ImagesAdapter) {
+        this.imagesAdapter = imagesAdapter
+        if (!::jsonResponce.isInitialized) {
+            val responce = fetchMemes()
+            jsonResponce = Gson().fromJson(responce, ServerResponse::class.java)
         }
-        return memes
+        val urls = jsonResponce.data.memes.map { it.url }
+        FetchImagesForMemesAsyncTask(memes, fun() {
+            this.imagesAdapter.notifyDataSetChanged()
+        }).execute(urls)
+    }
+
+    fun continueStickingToData(imagesAdapter: ImagesAdapter){
+        this.imagesAdapter = imagesAdapter
     }
 
     override fun onBind(intent: Intent?): IBinder? {
@@ -48,11 +56,31 @@ class FetchMemesServer : Service() {
         return FetchMemesAsyncTask().execute().get()
     }
 
-    class FetchImagesForMemesAsyncTask :
-        AsyncTask<List<String>, Unit, List<MemWithBitmap>>() {
-        override fun doInBackground(vararg params: List<String>): List<MemWithBitmap> {
-            var index = 0
-            return params[0].map { MemWithBitmap(getBitmapFromURL(it), index++) }
+    class FetchImagesForMemesAsyncTask(
+        private var storage: MutableList<MemWithBitmap>?,
+        private val callback: () -> Unit
+    ) :
+        AsyncTask<List<String>, MemWithBitmap, Unit>() {
+        override fun doInBackground(vararg params: List<String>) {
+            params[0].forEachIndexed { i, it ->
+                publishProgress(
+                    MemWithBitmap(
+                        getBitmapFromURL(it),
+                        i
+                    )
+                )
+            }
+        }
+
+        override fun onProgressUpdate(vararg values: MemWithBitmap?) {
+            super.onProgressUpdate(*values)
+            storage?.add(values[0]!!)
+            callback()
+        }
+
+        override fun onPostExecute(result: Unit?) {
+            super.onPostExecute(result)
+            storage = null
         }
 
         private fun getBitmapFromURL(src: String?): Bitmap? {
