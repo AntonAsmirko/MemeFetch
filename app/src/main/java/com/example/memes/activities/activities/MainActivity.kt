@@ -43,6 +43,8 @@ class MainActivity : AppCompatActivity() {
             initRecycler(mService.memes)
             if (mService.memes.isEmpty()) {
                 mService.stickToData(imagesAdapter)
+            } else {
+                mService.continueStickingToData(imagesAdapter)
             }
         }
 

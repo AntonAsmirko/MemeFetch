@@ -7,21 +7,16 @@ import android.graphics.BitmapFactory
 import android.os.AsyncTask
 import android.os.Binder
 import android.os.IBinder
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.Observer
-import androidx.lifecycle.observe
 import com.example.memes.activities.adapters.ImagesAdapter
 import com.example.memes.activities.data.MemWithBitmap
 import com.example.memes.activities.data.ServerResponse
 import com.google.gson.Gson
 import java.io.IOException
 import java.io.InputStream
-import java.io.ObjectInput
 import java.net.HttpURLConnection
 import java.net.URL
 
-class FetchMemesServer : Service() {
+class FetchMemesServer : Service(){
 
     inner class LocalBinder : Binder() {
         fun getService(): FetchMemesServer = this@FetchMemesServer
@@ -29,23 +24,26 @@ class FetchMemesServer : Service() {
 
     private lateinit var jsonResponce: ServerResponse
     var memes = mutableListOf<MemWithBitmap>()
-    private lateinit var imagesAdapter: ImagesAdapter
     private val binder = LocalBinder()
+    private var isLoading = false
+    private lateinit var fetchImagesForMemesAsyncTask: FetchImagesForMemesAsyncTask
 
     fun stickToData(imagesAdapter: ImagesAdapter) {
-        this.imagesAdapter = imagesAdapter
         if (!::jsonResponce.isInitialized) {
             val responce = fetchMemes()
             jsonResponce = Gson().fromJson(responce, ServerResponse::class.java)
         }
         val urls = jsonResponce.data.memes.map { it.url }
-        FetchImagesForMemesAsyncTask(memes, fun() {
-            this.imagesAdapter.notifyDataSetChanged()
-        }).execute(urls)
+        fetchImagesForMemesAsyncTask = FetchImagesForMemesAsyncTask(
+            memes,
+            { this.isLoading = false },
+            imagesAdapter
+        )
+        fetchImagesForMemesAsyncTask.execute(urls)
     }
 
-    fun continueStickingToData(imagesAdapter: ImagesAdapter){
-        this.imagesAdapter = imagesAdapter
+    fun continueStickingToData(imagesAdapter: ImagesAdapter) {
+        fetchImagesForMemesAsyncTask.imagesAdapter = imagesAdapter
     }
 
     override fun onBind(intent: Intent?): IBinder? {
@@ -58,9 +56,10 @@ class FetchMemesServer : Service() {
 
     class FetchImagesForMemesAsyncTask(
         private var storage: MutableList<MemWithBitmap>?,
-        private val callback: () -> Unit
+        private val isLoadingNotifier: () -> Unit,
+        var imagesAdapter: ImagesAdapter?
     ) :
-        AsyncTask<List<String>, MemWithBitmap, Unit>() {
+        AsyncTask<List<String>, MemWithBitmap, Unit>(){
         override fun doInBackground(vararg params: List<String>) {
             params[0].forEachIndexed { i, it ->
                 publishProgress(
@@ -75,12 +74,14 @@ class FetchMemesServer : Service() {
         override fun onProgressUpdate(vararg values: MemWithBitmap?) {
             super.onProgressUpdate(*values)
             storage?.add(values[0]!!)
-            callback()
+            imagesAdapter!!.notifyDataSetChanged()
         }
 
         override fun onPostExecute(result: Unit?) {
             super.onPostExecute(result)
+            isLoadingNotifier()
             storage = null
+            imagesAdapter = null
         }
 
         private fun getBitmapFromURL(src: String?): Bitmap? {
