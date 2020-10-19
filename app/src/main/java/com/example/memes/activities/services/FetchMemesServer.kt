@@ -16,7 +16,7 @@ import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
-class FetchMemesServer : Service(){
+class FetchMemesServer : Service() {
 
     inner class LocalBinder : Binder() {
         fun getService(): FetchMemesServer = this@FetchMemesServer
@@ -25,21 +25,23 @@ class FetchMemesServer : Service(){
     private lateinit var jsonResponce: ServerResponse
     var memes = mutableListOf<MemWithBitmap>()
     private val binder = LocalBinder()
-    private var isLoading = false
+    var isLoading = false
     private lateinit var fetchImagesForMemesAsyncTask: FetchImagesForMemesAsyncTask
 
     fun stickToData(imagesAdapter: ImagesAdapter) {
         if (!::jsonResponce.isInitialized) {
-            val responce = fetchMemes()
-            jsonResponce = Gson().fromJson(responce, ServerResponse::class.java)
+            FetchMemesAsyncTask { responce ->
+                jsonResponce = Gson().fromJson(responce, ServerResponse::class.java)
+                val urls = jsonResponce.data.memes.map { it.url }
+                fetchImagesForMemesAsyncTask = FetchImagesForMemesAsyncTask(
+                    memes,
+                    { this.isLoading = false },
+                    imagesAdapter
+                )
+                isLoading = true
+                fetchImagesForMemesAsyncTask.execute(urls)
+            }.execute()
         }
-        val urls = jsonResponce.data.memes.map { it.url }
-        fetchImagesForMemesAsyncTask = FetchImagesForMemesAsyncTask(
-            memes,
-            { this.isLoading = false },
-            imagesAdapter
-        )
-        fetchImagesForMemesAsyncTask.execute(urls)
     }
 
     fun continueStickingToData(imagesAdapter: ImagesAdapter) {
@@ -50,16 +52,12 @@ class FetchMemesServer : Service(){
         return binder
     }
 
-    private fun fetchMemes(): String {
-        return FetchMemesAsyncTask().execute().get()
-    }
-
     class FetchImagesForMemesAsyncTask(
         private var storage: MutableList<MemWithBitmap>?,
         private val isLoadingNotifier: () -> Unit,
         var imagesAdapter: ImagesAdapter?
     ) :
-        AsyncTask<List<String>, MemWithBitmap, Unit>(){
+        AsyncTask<List<String>, MemWithBitmap, Unit>() {
         override fun doInBackground(vararg params: List<String>) {
             params[0].forEachIndexed { i, it ->
                 publishProgress(
@@ -100,12 +98,14 @@ class FetchMemesServer : Service(){
         }
     }
 
-    class FetchMemesAsyncTask : AsyncTask<String, Unit, String>() {
-        override fun doInBackground(vararg params: String?): String {
-            return URL("https://api.imgflip.com/get_memes").openConnection().run {
+    class FetchMemesAsyncTask(private val callback: (String) -> Unit) :
+        AsyncTask<String, Unit, Unit>() {
+        override fun doInBackground(vararg params: String?) {
+            val res = URL("https://api.imgflip.com/get_memes").openConnection().run {
                 connect()
                 getInputStream().bufferedReader().readLines().joinToString("")
             }
+            callback(res)
         }
     }
 }
